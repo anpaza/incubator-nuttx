@@ -61,4 +61,7 @@
  * Public Function Prototypes
  ****************************************************************************/
 
+int setjmp(jmp_buf env);
+void longjmp(jmp_buf env, int val) noreturn_function;
+
 #endif /* __INCLUDE_NUTTX_LIB_SETJMP_H */
