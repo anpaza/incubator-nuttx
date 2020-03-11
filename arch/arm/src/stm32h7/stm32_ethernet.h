@@ -50,10 +50,6 @@
 #if STM32H7_NETHERNET > 0
 #ifndef __ASSEMBLY__
 
-/****************************************************************************
- * Public Function Prototypes
- ****************************************************************************/
-
 #undef EXTERN
 #if defined(__cplusplus)
 #define EXTERN extern "C"
@@ -62,6 +58,10 @@ extern "C"
 #else
 #define EXTERN extern
 #endif
+
+/****************************************************************************
+ * Public Types
+ ****************************************************************************/
 
 /* The stm32_ethmac_s encapsulates all state information for a single
  * hardware interface
@@ -77,6 +77,7 @@ struct stm32_ethmac_s
   WDOG_ID              txtimeout;   /* TX timeout timer */
   struct work_s        irqwork;     /* For deferring interrupt work to the work queue */
   struct work_s        pollwork;    /* For deferring poll work to the work queue */
+  struct work_s        statwork;    /* For deferring periodic link status check to the work queue */
 
   /* This holds the information visible to the NuttX network */
 
@@ -95,7 +96,13 @@ struct stm32_ethmac_s
   uint16_t             segments;    /* RX segment count */
   uint16_t             inflight;    /* Number of TX transfers "in_flight" */
   sq_queue_t           freeb;       /* The free buffer list */
+
+  uint16_t             stat_prev;   /* Interface status on last check */
 };
+
+/****************************************************************************
+ * Public Function Prototypes
+ ****************************************************************************/
 
 /****************************************************************************
  * Function: stm32_ethinitialize

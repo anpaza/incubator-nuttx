@@ -52,6 +52,7 @@
 #include "stm32_gpio.h"
 #include "stm32_rcc.h"
 #include "stm32_ethernet.h"
+#include "stm32_ethphy.h"
 
 #include <arch/board/board.h>
 
@@ -128,42 +129,6 @@
 #  endif
 #  if defined(CONFIG_STM32H7_RMII_MCO1) && defined(CONFIG_STM32H7_RMII_MCO2)
 #    error "Both CONFIG_STM32H7_RMII_MCO1 and CONFIG_STM32H7_RMII_MCO2 defined"
-#  endif
-#endif
-
-#ifdef CONFIG_STM32H7_AUTONEG
-#  ifndef CONFIG_STM32H7_PHYSR
-#    error "CONFIG_STM32H7_PHYSR must be defined in the NuttX configuration"
-#  endif
-#  ifdef CONFIG_STM32H7_PHYSR_ALTCONFIG
-#    ifndef CONFIG_STM32H7_PHYSR_ALTMODE
-#      error "CONFIG_STM32H7_PHYSR_ALTMODE must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_10HD
-#      error "CONFIG_STM32H7_PHYSR_10HD must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_100HD
-#      error "CONFIG_STM32H7_PHYSR_100HD must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_10FD
-#      error "CONFIG_STM32H7_PHYSR_10FD must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_100FD
-#      error "CONFIG_STM32H7_PHYSR_100FD must be defined in the NuttX configuration"
-#    endif
-#  else
-#    ifndef CONFIG_STM32H7_PHYSR_SPEED
-#      error "CONFIG_STM32H7_PHYSR_SPEED must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_100MBPS
-#      error "CONFIG_STM32H7_PHYSR_100MBPS must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_MODE
-#      error "CONFIG_STM32H7_PHYSR_MODE must be defined in the NuttX configuration"
-#    endif
-#    ifndef CONFIG_STM32H7_PHYSR_FULLDUPLEX
-#      error "CONFIG_STM32H7_PHYSR_FULLDUPLEX must be defined in the NuttX configuration"
-#    endif
 #  endif
 #endif
 
@@ -273,10 +238,13 @@
 
 #define STM32_TXTIMEOUT   (60*CLK_TCK)
 
+/* Link status check period, in OS clocks */
+
+#define STM32_STATUS_CHECK_PERIOD (CLOCKS_PER_SEC)
+
 /* PHY reset/configuration delays in milliseconds */
 
 #define PHY_RESET_DELAY   (65)
-#define PHY_CONFIG_DELAY  (1000)
 
 /* PHY read/write delays in loop counts */
 
@@ -707,6 +675,7 @@ static int  stm32_phywrite(uint16_t phydevaddr, uint16_t phyregaddr,
 static inline int stm32_dm9161(struct stm32_ethmac_s *priv);
 #endif
 static int  stm32_phyinit(struct stm32_ethmac_s *priv);
+static int  stm32_phyupdate(struct stm32_ethmac_s *priv);
 #ifdef CONFIG_STM32H7_ETHMAC_REGDEBUG
 static void  stm32_phyregdump(void);
 #endif
@@ -723,6 +692,7 @@ static inline void stm32_ethgpioconfig(struct stm32_ethmac_s *priv);
 static void stm32_ethreset(struct stm32_ethmac_s *priv);
 static int  stm32_macconfig(struct stm32_ethmac_s *priv);
 static void stm32_macaddress(struct stm32_ethmac_s *priv);
+static int  stm32_macupdate(struct stm32_ethmac_s *priv);
 #ifdef CONFIG_NET_ICMPv6
 static void stm32_ipv6multicast(struct stm32_ethmac_s *priv);
 #endif
@@ -1763,6 +1733,10 @@ static int stm32_recvframe(struct stm32_ethmac_s *priv)
                   nwarn("WARNING: DROPPED RX descriptor errors: %08x\n",
                         rxdesc->des3);
                   stm32_freesegment(priv, rxcurr, priv->segments);
+
+                  /* Update stats */
+
+                  NETDEV_RXERRORS(&priv->dev);
                 }
             }
         }
@@ -1846,6 +1820,10 @@ static void stm32_receive(struct stm32_ethmac_s *priv)
               dev->d_buf = NULL;
               dev->d_len = 0;
             }
+
+          /* Update dropped packet stats */
+
+          NETDEV_RXDROPPED(&priv->dev);
 
           continue;
         }
@@ -1954,6 +1932,10 @@ static void stm32_receive(struct stm32_ethmac_s *priv)
 #endif
         {
           nwarn("WARNING: DROPPED Unknown type: %04x\n", BUF->type);
+
+          /* Update dropped packet stats */
+
+          NETDEV_RXDROPPED(&priv->dev);
         }
 
       /* We are finished with the RX buffer.  NOTE:  If the buffer is
@@ -2217,7 +2199,7 @@ static void stm32_interrupt_work(void *arg)
     {
       /* Just let the user know what happened */
 
-      nerr("ERROR: Abormal event(s): %08x\n", dmasr);
+      nerr("ERROR: Abnormal event(s): %08x\n", dmasr);
 
       /* Clear all pending abnormal events */
 
@@ -3169,6 +3151,28 @@ static int stm32_phyread(uint16_t phydevaddr, uint16_t phyregaddr,
 }
 
 /****************************************************************************
+ * Function: stm32_phyread_chk
+ *
+ * Description:
+ *  Checked stm32_phyread(). Prints a error message (if network debug logging
+ *  is enabled) if return code is less than zero. Otherwise identical to 
+ *  stm32_phyread().
+ *
+ * Parameters:
+ *  Same as for stm32_phyread()
+ */
+
+static int stm32_phyread_chk(uint16_t phydevaddr, uint16_t phyregaddr,
+                             uint16_t *value)
+{
+  int ret = stm32_phyread(phydevaddr, phyregaddr, value);
+  if (ret < 0)
+    nerr("ERROR: Failed to read PHY%d.%d, error %d\n",
+         phydevaddr, phyregaddr, -ret);
+  return ret;
+}
+
+/****************************************************************************
  * Function: stm32_phywrite
  *
  * Description:
@@ -3276,12 +3280,8 @@ static inline int stm32_dm9161(struct stm32_ethmac_s *priv)
    * indication that check if the DM9161 PHY CHIP is not ready.
    */
 
-  ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, MII_PHYID1, &phyval);
-  if (ret < 0)
-    {
-      nerr("ERROR: Failed to read the PHY ID1: %d\n", ret);
-      return ret;
-    }
+  if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_PHYID1, &phyval)) < 0)
+    return ret;
 
   /* If we failed to read the PHY ID1 register, the reset the MCU to recover */
 
@@ -3294,12 +3294,8 @@ static inline int stm32_dm9161(struct stm32_ethmac_s *priv)
 
   /* Now check the "DAVICOM Specified Configuration Register (DSCR)", Register 16 */
 
-  ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, 16, &phyval);
-  if (ret < 0)
-    {
-      nerr("ERROR: Failed to read the PHY Register 0x10: %d\n", ret);
-      return ret;
-    }
+  if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, 16, &phyval)) < 0)
+    return ret;
 
   /* Bit 8 of the DSCR register is zero, then the DM9161 has not selected
    * RMII.  If RMII is not selected, then reset the MCU to recover.
@@ -3337,18 +3333,226 @@ static void stm32_phyregdump()
 
   for (i = 0; i < 0x20; i++)
     {
-      ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, i, &phyval);
-      if (ret < 0)
-        {
-          nerr("ERROR: Failed to read reg: 0%2x\n", i);
-        }
-      else
+      if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, i, &phyval)) >= 0)
         {
           ninfo("Phy reg 0x%02x == 0x%x\n", i, phyval);
         }
     }
 }
 #endif
+
+/****************************************************************************
+ * Function: stm32_phyupdate
+ *
+ * Description:
+ *  If PHY status changed, update network interface structure to reflect
+ *  the actual link status read from PHY registers.
+ *
+ *  If link status has changed, updates the MAC registers by calling
+ *  stm32_macupdate().
+ *
+ * Parameters:
+ *   priv - A reference to the private driver state structure
+ *
+ * Returned Value:
+ *   OK on success; Negated errno on failure.
+ */
+static int stm32_phyupdate(struct stm32_ethmac_s *priv)
+{
+  int ret;
+  uint16_t phyval;
+  uint16_t stat;
+
+  /* Check link status */
+
+  if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_MSR, &phyval)) < 0)
+    return ret;
+
+  /* A change in any of these bits will trigger link status re-evaluation */
+
+  stat = phyval & (MII_MSR_LINKSTATUS | MII_MSR_ANEGCOMPLETE);
+  if (priv->stat_prev == stat)
+    return OK;
+
+  priv->stat_prev = stat;
+  ((phyval & MII_MSR_LINKSTATUS) ? netdev_carrier_on : netdev_carrier_off) (&priv->dev);
+
+  /* Assume 10MBps and half duplex */
+
+  priv->mbps100 = 0;
+  priv->fduplex = 0;
+
+  /* Check link status */
+
+  if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_MSR, &phyval)) < 0)
+    return ret;
+  ((phyval & MII_MSR_LINKSTATUS) ? netdev_carrier_on : netdev_carrier_off) (&priv->dev);
+
+  /* Perform auto-negotiation if so configured */
+
+#ifdef CONFIG_STM32H7_AUTONEG
+
+#ifndef STM32_PHYSR_N
+
+  /* PHY status register number not defined, use only generic MII registers
+     to detect PHY state & speed */
+
+  do
+    {
+      uint16_t lpa, adv;
+
+      if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_LPA, &lpa)) < 0 ||
+          (ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_ADVERTISE, &adv)) < 0)
+        return ret;
+
+      /* Select best caps from our & partner abilities, and hope they really use that... */
+      lpa &= adv;
+
+      if (lpa & (MII_LPA_100BASETXFULL | MII_LPA_100BASETXHALF))
+        {
+          priv->mbps100 = 1;
+          priv->fduplex = (lpa & MII_LPA_100BASETXFULL) ? 1 : 0;
+        }
+      else
+        {
+          priv->fduplex = (lpa & MII_LPA_10BASETXFULL) ? 1 : 0;
+        }
+    }
+  while (0);
+
+#else
+
+  /* Read the result of the auto-negotiation from the PHY-specific register */
+
+  if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, STM32_PHYSR_N, &phyval)) < 0)
+    return ret;
+
+  ninfo("PHYSR[%d]: %04x\n", STM32_PHYSR_N, phyval);
+
+  /* Check if autonegotiation is complete */
+
+#ifdef STM32_PHYSR_ANEG_MASK
+  if ((phyval & STM32_PHYSR_ANEG_MASK) == STM32_PHYSR_ANEG_OK)
+    {
+#endif
+      /* Remember the selected speed and duplex modes */
+      /* Different PHYs present speed and mode information in different ways. */
+
+#ifdef STM32_PHYSR_MODE_MASK
+      /* If STM32_PHYSR_MODE_MASK is defined, this indicates that
+       * the PHY represents speed and mode information are combined,
+       * for example, with separate bits for 10HD, 100HD, 10FD and 100FD.
+       */
+
+      switch (phyval & STM32_PHYSR_MODE_MASK)
+        {
+          default:
+            nerr("ERROR: Unrecognized PHY status setting\n");
+
+          /* Falls through */
+
+          case STM32_PHYSR_MODE_10HD:
+            priv->fduplex = 0;
+            priv->mbps100 = 0;
+            break;
+
+          case STM32_PHYSR_MODE_100HD:
+            priv->fduplex = 0;
+            priv->mbps100 = 1;
+            break;
+
+          case STM32_PHYSR_MODE_10FD:
+            priv->fduplex = 1;
+            priv->mbps100 = 0;
+            break;
+
+          case STM32_PHYSR_MODE_100FD:
+            priv->fduplex = 1;
+            priv->mbps100 = 1;
+            break;
+        }
+
+#else /* STM32_PHYSR_MODE_MASK not defined */
+
+      /* Other PHYs, for example, may provide a 10/100 Mbps
+       * indication and a separate full/half duplex indication.
+       */
+
+      if ((phyval & STM32_PHYSR_DUPLEX_MASK) == STM32_PHYSR_DUPLEX_FULL)
+        {
+          priv->fduplex = 1;
+        }
+
+      if ((phyval & STM32_PHYSR_SPEED_MASK) == STM32_PHYSR_SPEED_100)
+        {
+          priv->mbps100 = 1;
+        }
+#endif
+
+#ifdef STM32_PHYSR_ANEG_MASK
+    }
+#endif
+
+#endif /* STM32_PHYSR_N */
+
+#else /* Auto-negotion not selected */
+
+#ifdef CONFIG_STM32H7_ETHFD
+  priv->fduplex = 1;
+#endif
+#ifdef CONFIG_STM32H7_ETH100MBPS
+  priv->mbps100 = 1;
+#endif
+
+#endif /* CONFIG_STM32H7_AUTONEG */
+
+  /* Set up MAC registers to reflect current link status */
+
+  if ((ret = stm32_macupdate(priv)) < 0)
+    return ret;
+
+#ifdef CONFIG_STM32H7_ETHMAC_REGDEBUG
+  stm32_phyregdump();
+#endif
+
+  ninfo("%s is %s at %d MBps %s duplex\n",
+        priv->dev.d_ifname,
+        (priv->dev.d_flags & IFF_RUNNING) ? "RUNNING" :
+        (priv->dev.d_flags & IFF_UP) ? "UP" : "DOWN",
+        priv->mbps100 ? 100 : 10,
+        priv->fduplex ? "FULL" : "HALF");
+
+  return OK;
+}
+
+/****************************************************************************
+ * Function: stm32_statcheck_work
+ *
+ * Description:
+ *  Invoked at regular intervals to check if network link status changed
+ *
+ * Parameters:
+ *   priv - A reference to the private driver state structure
+ *
+ * Assumptions:
+ *
+ ****************************************************************************/
+static void stm32_statcheck_work(void *arg)
+{
+  struct stm32_ethmac_s *priv = (struct stm32_ethmac_s *)arg;
+
+  if (priv->ifup)
+    {
+      net_lock();
+
+      stm32_phyupdate(priv);
+
+      net_unlock();
+    }
+
+  /* Schedule next status check */
+  work_queue(ETHWORK, &priv->statwork, stm32_statcheck_work, priv, STM32_STATUS_CHECK_PERIOD);
+}
 
 /****************************************************************************
  * Function: stm32_phyinit
@@ -3368,18 +3572,12 @@ static void stm32_phyregdump()
 
 static int stm32_phyinit(struct stm32_ethmac_s *priv)
 {
-#ifdef CONFIG_STM32H7_AUTONEG
-  volatile uint32_t timeout;
-#endif
   uint32_t regval;
   uint16_t phyval;
-  int ret;
-  int to;
-
-  /* Assume 10MBps and half duplex */
-
-  priv->mbps100 = 0;
-  priv->fduplex = 0;
+  int ret, to;
+#ifdef CONFIG_DEBUG_NET_INFO
+  uint16_t id1, id2;
+#endif
 
   /* Setup up PHY clocking by setting the CR field in the MACMDIOAR register */
 
@@ -3401,11 +3599,11 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
   to = PHY_RESET_DELAY;
   do
     {
-      up_mdelay(10);
-      to -= 10;
+      up_mdelay(1);
+      to--;
       ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, MII_MCR, &phyval);
     }
-  while (phyval & MII_MCR_RESET && to > 0);
+  while ((ret < 0 || phyval & MII_MCR_RESET) && to > 0);
 
   if (to <= 0)
     {
@@ -3421,6 +3619,12 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
   stm32_phyregdump();
 #endif
 
+  /* If PHY requires additional steps to init, do it */
+
+#ifdef STM32_PHY_INIT
+  STM32_PHY_INIT;
+#endif
+
   /* Special workaround for the Davicom DM9161 PHY is required. */
 
 #ifdef CONFIG_ETH0_PHY_DM9161
@@ -3431,30 +3635,7 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
     }
 #endif
 
-  /* Perform auto-negotiation if so configured */
-
 #ifdef CONFIG_STM32H7_AUTONEG
-  /* Wait for link status */
-
-  for (timeout = 0; timeout < PHY_RETRY_TIMEOUT; timeout++)
-    {
-      ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, MII_MSR, &phyval);
-      if (ret < 0)
-        {
-          nerr("ERROR: Failed to read the PHY MSR: %d\n", ret);
-          return ret;
-        }
-      else if ((phyval & MII_MSR_LINKSTATUS) != 0)
-        {
-          break;
-        }
-    }
-
-  if (timeout >= PHY_RETRY_TIMEOUT)
-    {
-      nerr("ERROR: Timed out waiting for link status: %04x\n", phyval);
-      return -ETIMEDOUT;
-    }
 
   /* Enable auto-negotiation */
 
@@ -3466,102 +3647,21 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
       return ret;
     }
 
-  /* Wait until auto-negotiation completes */
-
-  for (timeout = 0; timeout < PHY_RETRY_TIMEOUT; timeout++)
-    {
-      ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, MII_MSR, &phyval);
-      if (ret < 0)
-        {
-          nerr("ERROR: Failed to read the PHY MSR: %d\n", ret);
-          return ret;
-        }
-      else if ((phyval & MII_MSR_ANEGCOMPLETE) != 0)
-        {
-          break;
-        }
-    }
-
-  if (timeout >= PHY_RETRY_TIMEOUT)
-    {
-      nerr("ERROR: Timed out waiting for auto-negotiation\n");
-      return -ETIMEDOUT;
-    }
-
-  /* Read the result of the auto-negotiation from the PHY-specific register */
-
-  ret = stm32_phyread(CONFIG_STM32H7_PHYADDR, CONFIG_STM32H7_PHYSR, &phyval);
-  if (ret < 0)
-    {
-      nerr("ERROR: Failed to read PHY status register\n");
-      return ret;
-    }
-
-  /* Remember the selected speed and duplex modes */
-
-  ninfo("PHYSR[%d]: %04x\n", CONFIG_STM32H7_PHYSR, phyval);
-
-  /* Different PHYs present speed and mode information in different ways.  IF
-   * This CONFIG_STM32H7_PHYSR_ALTCONFIG is selected, this indicates that
-   * the PHY represents speed and mode information are combined, for
-   * example, with separate bits for 10HD, 100HD, 10FD and 100FD.
-   */
-
-#ifdef CONFIG_STM32H7_PHYSR_ALTCONFIG
-  switch (phyval & CONFIG_STM32H7_PHYSR_ALTMODE)
-    {
-      default:
-        nerr("ERROR: Unrecognized PHY status setting\n");
-
-      /* Falls through */
-
-      case CONFIG_STM32H7_PHYSR_10HD:
-        priv->fduplex = 0;
-        priv->mbps100 = 0;
-        break;
-
-      case CONFIG_STM32H7_PHYSR_100HD:
-        priv->fduplex = 0;
-        priv->mbps100 = 1;
-        break;
-
-      case CONFIG_STM32H7_PHYSR_10FD:
-        priv->fduplex = 1;
-        priv->mbps100 = 0;
-        break;
-
-      case CONFIG_STM32H7_PHYSR_100FD:
-        priv->fduplex = 1;
-        priv->mbps100 = 1;
-        break;
-    }
-
-  /* Different PHYs present speed and mode information in different ways.
-   * Some will present separate information for speed and mode (this is the
-   * default).  Those PHYs, for example, may provide a 10/100 Mbps
-   * indication and a separate full/half duplex indication.
-   */
-
-#else
-  if ((phyval & CONFIG_STM32H7_PHYSR_MODE) == CONFIG_STM32H7_PHYSR_FULLDUPLEX)
-    {
-      priv->fduplex = 1;
-    }
-
-  if ((phyval & CONFIG_STM32H7_PHYSR_SPEED) == CONFIG_STM32H7_PHYSR_100MBPS)
-    {
-      priv->mbps100 = 1;
-    }
-#endif
+  /* We will not wait until auto-negotiation completes,
+     periodic link status check will update link status when complete */
 
 #else /* Auto-negotiation not selected */
+
+  /* Remember the selected speed and duplex modes */
 
   phyval = 0;
 #ifdef CONFIG_STM32H7_ETHFD
   phyval |= MII_MCR_FULLDPLX;
+  priv->fduplex = 1;
 #endif
 #ifdef CONFIG_STM32H7_ETH100MBPS
   phyval |= MII_MCR_SPEED100;
+  priv->mbps100 = 1;
 #endif
 
   ret = stm32_phywrite(CONFIG_STM32H7_PHYADDR, MII_MCR, phyval, 0xffff);
@@ -3570,22 +3670,18 @@ static int stm32_phyinit(struct stm32_ethmac_s *priv)
       nerr("ERROR: Failed to write the PHY MCR: %d\n", ret);
       return ret;
     }
+#endif /* CONFIG_STM32H7_AUTONEG */
 
-  up_mdelay(PHY_CONFIG_DELAY);
+  /* Force read link status from PHY registers */
+  priv->stat_prev = 0xffff;
 
-  /* Remember the selected speed and duplex modes */
-
-#ifdef CONFIG_STM32H7_ETHFD
-  priv->fduplex = 1;
+#ifdef CONFIG_DEBUG_NET_INFO
+  if ((ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_PHYID1, &id1)) >= 0 &&
+      (ret = stm32_phyread_chk(CONFIG_STM32H7_PHYADDR, MII_PHYID2, &id2)) >= 0)
+    {
+      ninfo ("PHY ID is %04x:%04x\n", id1, id2);
+    }
 #endif
-#ifdef CONFIG_STM32H7_ETH100MBPS
-  priv->mbps100 = 1;
-#endif
-#endif
-
-  ninfo("Duplex: %s Speed: %d MBps\n",
-        priv->fduplex ? "FULL" : "HALF",
-        priv->mbps100 ? 100 : 10);
 
   return OK;
 }
@@ -3854,6 +3950,54 @@ static void stm32_ethreset(struct stm32_ethmac_s *priv)
   regval &= ~DMASBMR_CLEAR_MASK;
   regval |= DMASBMR_SET_MASK;
   stm32_putreg(regval, STM32_ETH_DMASBMR);
+
+  /* Update speed & duplex in MACCR */
+
+  stm32_macupdate(priv);
+}
+
+/****************************************************************************
+ * Function: stm32_macupdate
+ *
+ * Description:
+ *  Update the Ethernet MAC registers according to current link config.
+ *
+ * Parameters:
+ *   priv - A reference to the private driver state structure
+ *
+ * Returned Value:
+ *   OK on success; Negated errno on failure.
+ *
+ * Assumptions:
+ *
+ ****************************************************************************/
+
+static int stm32_macupdate(struct stm32_ethmac_s *priv)
+{
+  uint32_t regval;
+
+  /* Update the MACCR register */
+
+  regval  = stm32_getreg(STM32_ETH_MACCR);
+  regval &= ~(ETH_MACCR_DM | ETH_MACCR_FES);
+
+  if (priv->fduplex)
+    {
+      /* Set the DM bit for full duplex support */
+
+      regval |= ETH_MACCR_DM;
+    }
+
+  if (priv->mbps100)
+    {
+      /* Set the FES bit for 100Mbps fast ethernet support */
+
+      regval |= ETH_MACCR_FES;
+    }
+
+  stm32_putreg(regval, STM32_ETH_MACCR);
+
+  return OK;
 }
 
 /****************************************************************************
@@ -3917,28 +4061,6 @@ static int stm32_macconfig(struct stm32_ethmac_s *priv)
 
   /* MAC Configuration */
 
-  /* Set up the MACCR register */
-
-  regval  = stm32_getreg(STM32_ETH_MACCR);
-  regval &= ~MACCR_CLEAR_BITS;
-  regval |= MACCR_SET_BITS;
-
-  if (priv->fduplex)
-    {
-      /* Set the DM bit for full duplex support */
-
-      regval |= ETH_MACCR_DM;
-    }
-
-  if (priv->mbps100)
-    {
-      /* Set the FES bit for 100Mbps fast ethernet support */
-
-      regval |= ETH_MACCR_FES;
-    }
-
-  stm32_putreg(regval, STM32_ETH_MACCR);
-
   /* Set up the MACPFR register */
 
   regval  = stm32_getreg(STM32_ETH_MACPFR);
@@ -3968,7 +4090,8 @@ static int stm32_macconfig(struct stm32_ethmac_s *priv)
   /* Setup up the MACVTR register */
 
   stm32_putreg(0, STM32_ETH_MACVTR);
-  return OK;
+
+  return stm32_macupdate(priv);
 }
 
 /****************************************************************************
@@ -4308,7 +4431,8 @@ static inline int stm32_ethinitialize(int intf)
 #ifdef CONFIG_NETDEV_PHY_IOCTL
   priv->dev.d_ioctl   = stm32_ioctl;    /* Support PHY ioctl() calls */
 #endif
-  priv->dev.d_private = (void *)g_stm32ethmac; /* Used to recover private state from dev */
+  priv->dev.d_private =
+    (void *)g_stm32ethmac;              /* Used to recover private state from dev */
   priv->intf          = intf;           /* Remember the interface number */
 
   /* Create a watchdog for timing polling for and timing of transmissions */
@@ -4343,6 +4467,11 @@ static inline int stm32_ethinitialize(int intf)
   /* Put the interface in the down state. */
 
   stm32_ifdown(&priv->dev);
+
+  /* Start the periodic link status check */
+
+  work_queue(ETHWORK, &priv->statwork, stm32_statcheck_work, priv,
+    STM32_STATUS_CHECK_PERIOD);
 
   /* Register the device with the OS so that socket IOCTLs can be performed */
 
