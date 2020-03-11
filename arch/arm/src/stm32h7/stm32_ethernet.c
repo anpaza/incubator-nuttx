@@ -36,11 +36,8 @@
 
 #include <nuttx/arch.h>
 #include <nuttx/irq.h>
-#include <nuttx/wdog.h>
-#include <nuttx/wqueue.h>
 #include <nuttx/net/mii.h>
 #include <nuttx/net/arp.h>
-#include <nuttx/net/netdev.h>
 
 #if defined(CONFIG_NET_PKT)
 #  include <nuttx/net/pkt.h>
@@ -581,40 +578,6 @@ union stm32_desc_u
 {
   uint8_t             pad[DESC_PADSIZE];
   struct eth_desc_s   desc;
-};
-
-/* The stm32_ethmac_s encapsulates all state information for a single
- * hardware interface
- */
-
-struct stm32_ethmac_s
-{
-  uint8_t              ifup    : 1; /* true:ifup false:ifdown */
-  uint8_t              mbps100 : 1; /* 100MBps operation (vs 10 MBps) */
-  uint8_t              fduplex : 1; /* Full (vs. half) duplex */
-  uint8_t              intf;        /* Ethernet interface number */
-  WDOG_ID              txpoll;      /* TX poll timer */
-  WDOG_ID              txtimeout;   /* TX timeout timer */
-  struct work_s        irqwork;     /* For deferring interrupt work to the work queue */
-  struct work_s        pollwork;    /* For deferring poll work to the work queue */
-
-  /* This holds the information visible to the NuttX network */
-
-  struct net_driver_s  dev;         /* Interface understood by the network */
-
-  /* Used to track transmit and receive descriptors */
-
-  struct eth_desc_s *txhead;        /* Next available TX descriptor */
-  struct eth_desc_s *rxhead;        /* Next available RX descriptor */
-
-  struct eth_desc_s *txchbase;      /* TX descriptor ring base address */
-  struct eth_desc_s *rxchbase;      /* RX descriptor ring base address */
-
-  struct eth_desc_s *txtail;        /* First "in_flight" TX descriptor */
-  struct eth_desc_s *rxcurr;        /* First RX descriptor of the segment */
-  uint16_t             segments;    /* RX segment count */
-  uint16_t             inflight;    /* Number of TX transfers "in_flight" */
-  sq_queue_t           freeb;       /* The free buffer list */
 };
 
 /****************************************************************************
@@ -4238,7 +4201,7 @@ static int stm32_ethconfig(struct stm32_ethmac_s *priv)
 #ifdef CONFIG_STM32H7_PHYINIT
   /* Perform any necessary, board-specific PHY initialization */
 
-  ret = stm32_phy_boardinitialize(0);
+  ret = stm32_phy_boardinitialize(priv);
   if (ret < 0)
     {
       nerr("ERROR: Failed to initialize the PHY: %d\n", ret);
@@ -4321,6 +4284,9 @@ static inline int stm32_ethinitialize(int intf)
 #endif
 {
   struct stm32_ethmac_s *priv;
+#ifdef CONFIG_STM32H7_PHYINIT
+  int ret;
+#endif
 
   ninfo("intf: %d\n", intf);
 
@@ -4366,7 +4332,7 @@ static inline int stm32_ethinitialize(int intf)
 #ifdef CONFIG_STM32H7_PHYINIT
   /* Perform any necessary, board-specific PHY initialization */
 
-  ret = stm32_phy_boardinitialize(0);
+  ret = stm32_phy_boardinitialize(priv);
   if (ret < 0)
     {
       nerr("ERROR: Failed to initialize the PHY: %d\n", ret);

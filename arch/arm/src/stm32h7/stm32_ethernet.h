@@ -41,6 +41,9 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <nuttx/wdog.h>
+#include <nuttx/wqueue.h>
+#include <nuttx/net/netdev.h>
 
 #include "hardware/stm32_ethernet.h"
 
@@ -59,6 +62,40 @@ extern "C"
 #else
 #define EXTERN extern
 #endif
+
+/* The stm32_ethmac_s encapsulates all state information for a single
+ * hardware interface
+ */
+
+struct stm32_ethmac_s
+{
+  uint8_t              ifup    : 1; /* true:ifup false:ifdown */
+  uint8_t              mbps100 : 1; /* 100MBps operation (vs 10 MBps) */
+  uint8_t              fduplex : 1; /* Full (vs. half) duplex */
+  uint8_t              intf;        /* Ethernet interface number */
+  WDOG_ID              txpoll;      /* TX poll timer */
+  WDOG_ID              txtimeout;   /* TX timeout timer */
+  struct work_s        irqwork;     /* For deferring interrupt work to the work queue */
+  struct work_s        pollwork;    /* For deferring poll work to the work queue */
+
+  /* This holds the information visible to the NuttX network */
+
+  struct net_driver_s  dev;         /* Interface understood by the network */
+
+  /* Used to track transmit and receive descriptors */
+
+  struct eth_desc_s *txhead;        /* Next available TX descriptor */
+  struct eth_desc_s *rxhead;        /* Next available RX descriptor */
+
+  struct eth_desc_s *txchbase;      /* TX descriptor ring base address */
+  struct eth_desc_s *rxchbase;      /* RX descriptor ring base address */
+
+  struct eth_desc_s *txtail;        /* First "in_flight" TX descriptor */
+  struct eth_desc_s *rxcurr;        /* First RX descriptor of the segment */
+  uint16_t             segments;    /* RX segment count */
+  uint16_t             inflight;    /* Number of TX transfers "in_flight" */
+  sq_queue_t           freeb;       /* The free buffer list */
+};
 
 /****************************************************************************
  * Function: stm32_ethinitialize
@@ -91,12 +128,14 @@ int stm32_ethinitialize(int intf);
  *   Some boards require specialized initialization of the PHY before it can
  *   be used.  This may include such things as configuring GPIOs, resetting
  *   the PHY, etc.  If CONFIG_STM32H7_PHYINIT is defined in the configuration
- *   then the board specific logic must provide stm32_phyinitialize();  The
- *   STM32 Ethernet driver will call this function one time before it first
- *   uses the PHY.
+ *   then the board specific logic must provide stm32_phy_boardinitialize();
+ *   The STM32 Ethernet driver will call this function one time before it
+ *   first uses the PHY.
  *
  * Parameters:
- *   intf - Always zero for now.
+ *   priv - A pointer to STM32 MAC driver-specific structure. Board-specific
+ *      code has a chance to e.g. load priv->dev.d_mac from private flash
+ *      memory areas and so on.
  *
  * Returned Value:
  *   OK on success; Negated errno on failure.
@@ -106,7 +145,7 @@ int stm32_ethinitialize(int intf);
  ****************************************************************************/
 
 #ifdef CONFIG_STM32H7_PHYINIT
-int stm32_phy_boardinitialize(int intf);
+int stm32_phy_boardinitialize(FAR struct stm32_ethmac_s *priv);
 #endif
 
 #undef EXTERN
