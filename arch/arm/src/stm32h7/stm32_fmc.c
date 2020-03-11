@@ -45,11 +45,6 @@
 
 #include <debug.h>
 
-//#include "stm32_fmc.h"
-//#include "hardware/stm32_pinmap.h"
-//#include "stm32_gpio.h"
-//#include "stm32_rcc.h"
-
 #include <nuttx/arch.h>
 #include <arch/board/board.h>
 
@@ -86,63 +81,85 @@
  *      for subbanks 1-4.
  * BOARD_FMC_BTR[1..4] - Initial value for SRAM/NOR-Flash timing registers
  *      for subbanks 1-4.
- * BOARD_FMC_BWTR[1..4] - Initial value for SRAM/NOR-Flash write timing registers
- *      for subbanks 1-4.
+ * BOARD_FMC_BWTR[1..4] - Initial value for SRAM/NOR-Flash write timing
+ *      registers for subbanks 1-4.
  *
  *
- * For NAND flash memories FMC reserves 64Mb at 0x80000000. Define the following
- * macros in your board.h file to initialize FMC for this type of memory:
+ * For NAND flash memories FMC reserves 64Mb at 0x80000000. Define the
+ * following macros in your board.h file to initialize FMC for this type
+ * of memory:
  *
  * *** CURRENTLY NAND FLASH SUPPORT IS NOT IMPLEMENTED ***
  *
  * BOARD_FMC_PCR - Initial value for NAND flash control register.
- * BOARD_FMC_PMEM - Initial value for NAND flash common memory space timing register.
- * BOARD_FMC_PATT - Initial value for NAND flash attribute memory space timing register.
+ * BOARD_FMC_PMEM - Initial value for NAND flash common memory space timing
+ *      register.
+ * BOARD_FMC_PATT - Initial value for NAND flash attribute memory space
+ *      timing register.
  *
  *
- * For SDRAM memory FMC reserves 2 x 256Mb address ranges at 0xC0000000 and 0xD0000000.
- * Define the following macros to initialize FMC to work with SDRAM:
+ * For SDRAM memory FMC reserves 2 x 256Mb address ranges at 0xC0000000
+ * and 0xD0000000. Define the following macros to initialize FMC to work
+ * with SDRAM:
  *
- * BOARD_FMC_SDCR[1..2] - Initial value for SDRAM control registers for SDRAM bank 1-2.
- *      Note that some bits in SDCR1 influence both SDRAM banks and are unused in SDCR2!
- * BOARD_FMC_SDTR[1..2] - Initial value for SDRAM timing registeres for SDRAM bank 1-2.
- *      Note that some bits in SDTR1 influence both SDRAM banks and are unused in SDTR2!
- * BOARD_FMC_SDRAM_REFR_PERIOD - The SDRAM refresh rate period in FMC clocks, OR
- * BOARD_FMC_SDRAM_REFR_CYCLES and BOARD_FMC_SDRAM_REFR_PERIOD can be used to automatically
- *      compute refresh counter using data from SDRAM datasheet (cycles usually is 4096, 8192
- *      and such, and typical period is 64 (ms)) and knowing FMC clock frequency.
- * BOARD_FMC_SDRAM_AUTOREFRESH may be defined to a number between 1 and 16 to issue
- *      given number of SDRAM auto-refresh cycles before using it. This defaults to 3.
+ * BOARD_FMC_SDCR[1..2] - Initial value for SDRAM control registers for SDRAM
+ *      bank 1-2. Note that some bits in SDCR1 influence both SDRAM banks and
+ *      are unused in SDCR2!
+ * BOARD_FMC_SDTR[1..2] - Initial value for SDRAM timing registeres for SDRAM
+ *      bank 1-2. Note that some bits in SDTR1 influence both SDRAM banks and
+ *      are unused in SDTR2!
+ * BOARD_FMC_SDRAM_REFR_PERIOD - The SDRAM refresh rate period in FMC clocks,
+ *      OR
+ * BOARD_FMC_SDRAM_REFR_CYCLES and BOARD_FMC_SDRAM_REFR_PERIOD can be used to
+ *      automatically compute refresh counter using data from SDRAM datasheet
+ *      (cycles usually is 4096, 8192 and such, and typical period is 64 ms)
+ *      and knowing FMC clock frequency.
+ * BOARD_FMC_SDRAM_AUTOREFRESH may be defined to a number between 1 and 16 to
+ *      issue given number of SDRAM auto-refresh cycles before using it. This
+ *      defaults to 3.
  *
  *
  * Special notes:
  *      - FMC bank remapping (FMC_BCR_BMAP*) is not currently supported.
  *
  *
- * Here's a working example of a configured IS42S16320D SDRAM on a particular board:
+ * Here's a working example of a configured IS42S16320D SDRAM on a particular
+ * board:
  *
  *#define BOARD_SDRAM1_SIZE               (64*1024*1024)
  *
- *#define BOARD_FMC_SDCR1                 (FMC_SDCR_COLBITS_10 | FMC_SDCR_ROWBITS_13 | FMC_SDCR_WIDTH_16 | FMC_SDCR_BANKS_4 | FMC_SDCR_CASLAT_2 | FMC_SDCR_SDCLK_2X | FMC_SDCR_BURST_READ | FMC_SDCR_RPIPE_1)
- *#define BOARD_FMC_SDTR1                 (FMC_SDTR_TMRD(2) | FMC_SDTR_TXSR(7) | FMC_SDTR_TRAS(4) | FMC_SDTR_TRC(7) | FMC_SDTR_TWR(4) | FMC_SDTR_TRP(2) | FMC_SDTR_TRCD(2))
+ *#define BOARD_FMC_SDCR1 \
+ *      (FMC_SDCR_COLBITS_10 | FMC_SDCR_ROWBITS_13 | FMC_SDCR_WIDTH_16 |\
+ *       FMC_SDCR_BANKS_4 | FMC_SDCR_CASLAT_2 | FMC_SDCR_SDCLK_2X |\
+ *       FMC_SDCR_BURST_READ | FMC_SDCR_RPIPE_1)
+ *#define BOARD_FMC_SDTR1 \
+ *      (FMC_SDTR_TMRD(2) | FMC_SDTR_TXSR(7) | FMC_SDTR_TRAS(4) | \
+ *       FMC_SDTR_TRC(7) | FMC_SDTR_TWR(4) | FMC_SDTR_TRP(2) | \
+ *       FMC_SDTR_TRCD(2))
  *#define BOARD_FMC_SDRAM_REFR_CYCLES     8192
  *#define BOARD_FMC_SDRAM_REFR_PERIOD     64
- *#define BOARD_FMC_SDRAM_MODE            FMC_SDCMR_MRD_BURST_LENGTH_8 | \
- *                                        FMC_SDCMR_MRD_BURST_TYPE_SEQUENTIAL | \
- *                                        FMC_SDCMR_MRD_CAS_LATENCY_2
+ *#define BOARD_FMC_SDRAM_MODE \
+ *      FMC_SDCMR_MRD_BURST_LENGTH_8 | \
+ *      FMC_SDCMR_MRD_BURST_TYPE_SEQUENTIAL | \
+ *      FMC_SDCMR_MRD_CAS_LATENCY_2
  *
  *#define BOARD_FMC_GPIO_CONFIGS \
- *    GPIO_FMC_A0,GPIO_FMC_A1,GPIO_FMC_A2,GPIO_FMC_A3,GPIO_FMC_A4,GPIO_FMC_A5,GPIO_FMC_A6,GPIO_FMC_A7,\
- *    GPIO_FMC_A8,GPIO_FMC_A9,GPIO_FMC_A10,GPIO_FMC_A11,GPIO_FMC_A12,\
- *    GPIO_FMC_D0,GPIO_FMC_D1,GPIO_FMC_D2,GPIO_FMC_D3,GPIO_FMC_D4,GPIO_FMC_D5,GPIO_FMC_D6,GPIO_FMC_D7,\
- *    GPIO_FMC_D8,GPIO_FMC_D9,GPIO_FMC_D10,GPIO_FMC_D11,GPIO_FMC_D12,GPIO_FMC_D13,GPIO_FMC_D14,GPIO_FMC_D15,\
- *    GPIO_FMC_NBL0,GPIO_FMC_NBL1,GPIO_FMC_BA0,GPIO_FMC_BA1,\
- *    GPIO_FMC_SDNWE_2,GPIO_FMC_SDNCAS,GPIO_FMC_SDNRAS,GPIO_FMC_SDNE0_1,GPIO_FMC_SDCKE0_1,GPIO_FMC_SDCLK
+ *      GPIO_FMC_A0,GPIO_FMC_A1,GPIO_FMC_A2,GPIO_FMC_A3,GPIO_FMC_A4,\
+ *      GPIO_FMC_A5,GPIO_FMC_A6,GPIO_FMC_A7,GPIO_FMC_A8,GPIO_FMC_A9,\
+ *      GPIO_FMC_A10,GPIO_FMC_A11,GPIO_FMC_A12,\
+ *      GPIO_FMC_D0,GPIO_FMC_D1,GPIO_FMC_D2,GPIO_FMC_D3,GPIO_FMC_D4,\
+ *      GPIO_FMC_D5,GPIO_FMC_D6,GPIO_FMC_D7,GPIO_FMC_D8,GPIO_FMC_D9,\
+ *      GPIO_FMC_D10,GPIO_FMC_D11,GPIO_FMC_D12,GPIO_FMC_D13,\
+ *      GPIO_FMC_D14,GPIO_FMC_D15,\
+ *      GPIO_FMC_NBL0,GPIO_FMC_NBL1,GPIO_FMC_BA0,GPIO_FMC_BA1,\
+ *      GPIO_FMC_SDNWE_2,GPIO_FMC_SDNCAS,GPIO_FMC_SDNRAS,\
+ *      GPIO_FMC_SDNE0_1,GPIO_FMC_SDCKE0_1,GPIO_FMC_SDCLK
  *
  ****************************************************************************/
 
 #ifndef BOARD_FMC_CLK
 /* Clock FMC from PLL2R by default */
+
 #  define BOARD_FMC_CLK         RCC_D1CCIPR_FMCSEL_PLL2
 #endif
 
@@ -187,24 +204,27 @@
 #    error "Both BOARD_FMC_SDRAM_REFR_CYCLES and BOARD_FMC_SDRAM_REFR_PERIOD have to be defined to compute BOARD_FMC_SDRAM_REFR_PERIOD!"
 #  else
      /* Take care not to overflow on 32-bit arithmetic */
+
 #    define BOARD_FMC_SDRAM_REFR_PERIOD        ((uint32_t)((uint64_t)BOARD_FMC_SDRAM_REFR_PERIOD * FMC_CLK_FREQUENCY / BOARD_FMC_SDRAM_REFR_CYCLES - 20))
 #  endif
 
 #endif /* BOARD_FMC_SDRAM_REFR_PERIOD */
 
 /* The bits in FMC_SDCR we will alter at initialization */
+
 #define FMC_SDCR_MASK           (FMC_SDCR_COLBITS_MASK | FMC_SDCR_ROWBITS_MASK | \
     FMC_SDCR_WIDTH_MASK | FMC_SDCR_BANKS_MASK | FMC_SDCR_CASLAT_MASK | FMC_SDCR_WP | \
     FMC_SDCR_SDCLK_MASK | FMC_SDCR_BURST_READ | FMC_SDCR_RPIPE_MASK)
 
 /* The bits in FMC_SDTR we will alter at initialization */
+
 #define FMC_SDTR_MASK           (FMC_SDTR_TMRD_MASK | FMC_SDTR_TXSR_MASK | \
     FMC_SDTR_TRAS_MASK | FMC_SDTR_TRC_MASK | FMC_SDTR_TWR_MASK | FMC_SDTR_TRP_MASK | \
     FMC_SDTR_TRCD_MASK)
 
 /* The timeout while waiting for SDRAM controller to initialize, in us */
-#define SDRAM_INIT_TIMEOUT      (1000)
 
+#define SDRAM_INIT_TIMEOUT      (1000)
 
 /****************************************************************************
  * Private data
@@ -221,7 +241,6 @@ static uint32_t fmc_gpios[] =
 
 static void stm32_fmc_sdram_init(void);
 static int stm32_fmc_sdram_wait(unsigned timeout);
-
 
 /****************************************************************************
  * Public Functions
@@ -292,8 +311,10 @@ void stm32_fmc_init(void)
   /* Set up SDRAM refresh timings */
 
 #ifdef BOARD_FMC_SDRAM_REFR_PERIOD
-  /* ... The programmed COUNT value must not be equal to the sum of the following timings:
-     TWR+TRP+TRC+TRCD+4 memory clock cycles */
+  /* ... The programmed COUNT value must not be equal to the sum of the
+   * following timings: TWR+TRP+TRC+TRCD+4 memory clock cycles
+   */
+
 #ifdef BOARD_FMC_SDTR1
   DEBUGASSERT (BOARD_FMC_SDRAM_REFR_PERIOD !=
     (4 +
@@ -337,14 +358,16 @@ void stm32_fmc_sdram_init(void)
 {
   /* What is happening here:
    * ... A 100μs delay is required prior to issuing any command [...]
-   * a PRECHARGE command should be applied once the 100μs delay has been satisfied.
+   * a PRECHARGE command should be applied once the 100μs delay has been
+   * satisfied.
    *
-   * All banks must be precharged.  This will leave all banks in an idle state after
-   * which at least two AUTO REFRESH cycles must be performed. After the AUTO REFRESH
-   * cycles are complete, the SDRAM is then ready for mode register programming.
+   * All banks must be precharged.  This will leave all banks in an idle
+   * state after which at least two AUTO REFRESH cycles must be performed.
+   * After the AUTO REFRESH cycles are complete, the SDRAM is then ready
+   * for mode register programming.
    *
-   * The mode register should be loaded prior to applying any operational command
-   * because it will power up in an unknown state.
+   * The mode register should be loaded prior to applying any operational
+   * command because it will power up in an unknown state.
    */
 
   up_udelay(100);
@@ -410,7 +433,7 @@ int stm32_fmc_sdram_wait(unsigned timeout)
           && ((sdsr & FMC_SDSR_MODES2_MASK) == FMC_SDSR_MODES2_NORMAL)
 #endif
          )
-        return 0;
+          return 0;
 
       up_udelay(1);
     }

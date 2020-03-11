@@ -73,7 +73,7 @@
  * system heap. You must make sure it is large enough to hold all memory
  * regions you intend to use.
  *
- * The following memory types can be used for system heap on STM32H7 platform:
+ * The following memory types can be used for heap on STM32H7 platform:
  *
  * - AXI SRAM is a 512kb memory area. This will be automatically registered
  *      with the system heap in up_allocate_heap, all the other memory
@@ -94,9 +94,10 @@
  *
  * - External SDRAM can be connected to the FMC peripherial. Initialization
  *      of FMC is done as up_addregion() will invoke stm32_fmc_init().
- *      Please read the comment in stm32_fmc.c how to initialize FMC correctly.
+ *      Please read the comment in stm32_fmc.c how to initialize FMC
+ *      correctly.
  *
- *      Then, up to two regions of SDRAM may be registered with the system heap:
+ *      Then, up to two regions of SDRAM may be registered with the heap:
  *
  *      - BOARD_SDRAM1_SIZE, if defined, declares the size of SDRAM
  *              at address STM32_FMC_BANK5. +1 to CONFIG_MM_REGIONS.
@@ -205,7 +206,8 @@ void up_allocate_heap(FAR void **heap_start, size_t *heap_size)
    * of CONFIG_MM_KERNEL_HEAPSIZE (subject to alignment).
    */
 
-  uintptr_t ubase = (uintptr_t)USERSPACE->us_bssend + CONFIG_MM_KERNEL_HEAPSIZE;
+  uintptr_t ubase = (uintptr_t)USERSPACE->us_bssend +
+    CONFIG_MM_KERNEL_HEAPSIZE;
   size_t    usize = SRAM123_END - ubase;
   int       log2;
 
@@ -248,13 +250,9 @@ void up_allocate_heap(FAR void **heap_start, size_t *heap_size)
   up_heap_color(*heap_start, *heap_size);
 #endif
 
-#if defined(CONFIG_DEBUG_FEATURES)
-
   /* Display memory ranges to help debugging */
 
-  _info("%uKb of SRAM at %p\n", *heap_size / 1024, *heap_start);
-
-#endif
+  minfo("%uKb of SRAM at %p\n", *heap_size / 1024, *heap_start);
 }
 
 /****************************************************************************
@@ -275,7 +273,8 @@ void up_allocate_kheap(FAR void **heap_start, size_t *heap_size)
    * of CONFIG_MM_KERNEL_HEAPSIZE (subject to alignment).
    */
 
-  uintptr_t ubase = (uintptr_t)USERSPACE->us_bssend + CONFIG_MM_KERNEL_HEAPSIZE;
+  uintptr_t ubase = (uintptr_t)USERSPACE->us_bssend +
+    CONFIG_MM_KERNEL_HEAPSIZE;
   size_t    usize = SRAM123_END - ubase;
   int       log2;
 
@@ -312,6 +311,10 @@ void up_allocate_kheap(FAR void **heap_start, size_t *heap_size)
 
 static void addregion (uintptr_t start, uint32_t size, const char *desc)
 {
+  /* Display memory ranges to help debugging */
+
+  minfo("%uKb of %s at %p\n", size / 1024, desc, (FAR void *)start);
+
 #if defined(CONFIG_BUILD_PROTECTED) && defined(CONFIG_MM_KERNEL_HEAP)
 
   /* Allow user-mode access to the SRAM123 heap */
@@ -327,14 +330,6 @@ static void addregion (uintptr_t start, uint32_t size, const char *desc)
   /* Add the SRAM123 user heap region. */
 
   kumm_addregion((FAR void *)start, size);
-
-#if defined(CONFIG_DEBUG_FEATURES)
-
-  /* Display memory ranges to help debugging */
-
-  _info("%uKb of %s at %p\n", size / 1024, desc, (FAR void *)start);
-
-#endif
 }
 
 /****************************************************************************
