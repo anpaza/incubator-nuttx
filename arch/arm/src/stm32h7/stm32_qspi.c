@@ -1648,7 +1648,9 @@ static int qspi_memory_dma(struct stm32h7_qspidev_s *priv,
  * Name: qspi_receive_blocking
  *
  * Description:
- *   Do common data receive in a blocking (status polling) way
+ *   Do common data receive in a blocking (status polling) way.
+ *   Function does qspi_abort() before leaving, so you cannot relay on any
+ *   traces of the completed operation in registers, like checking for TCF!
  *
  * Input Parameters:
  *   priv  - The QSPI controller to dump
@@ -1724,7 +1726,9 @@ static int qspi_receive_blocking(struct stm32h7_qspidev_s *priv,
  * Name: qspi_transmit_blocking
  *
  * Description:
- *   Do common data transmit in a blocking (status polling) way
+ *   Do common data transmit in a blocking (status polling) way.
+ *   Function does qspi_abort() before leaving, so you cannot relay on any
+ *   traces of the completed operation in registers, like checking for TCF!
  *
  * Input Parameters:
  *   priv  - The QSPI controller to dump
@@ -2199,11 +2203,14 @@ static int qspi_command(struct qspi_dev_s *dev,
   else
     {
       ret = OK;
+
+      /* Wait for Transfer complete */
+
+      qspi_waitstatusflags(priv, QSPI_SR_TCF, 1);
     }
 
-  /* Wait for Transfer complete, and not busy */
+  /* Wait for not busy */
 
-  qspi_waitstatusflags(priv, QSPI_SR_TCF, 1);
   qspi_waitstatusflags(priv, QSPI_SR_BUSY, 0);
 
 #endif
@@ -2359,9 +2366,8 @@ static int qspi_memory(struct qspi_dev_s *dev,
           ret = qspi_receive_blocking(priv, &xctn);
         }
 
-      /* Wait for Transfer complete, and not busy */
+      /* Wait for not busy */
 
-      qspi_waitstatusflags(priv, QSPI_SR_TCF, 1);
       qspi_waitstatusflags(priv, QSPI_SR_BUSY, 0);
 
       MEMORY_SYNC();
@@ -2390,9 +2396,8 @@ static int qspi_memory(struct qspi_dev_s *dev,
       ret = qspi_receive_blocking(priv, &xctn);
     }
 
-  /* Wait for Transfer complete, and not busy */
+  /* Wait for not busy */
 
-  qspi_waitstatusflags(priv, QSPI_SR_TCF, 1);
   qspi_waitstatusflags(priv, QSPI_SR_BUSY, 0);
 
   MEMORY_SYNC();
