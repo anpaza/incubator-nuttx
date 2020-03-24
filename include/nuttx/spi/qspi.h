@@ -191,6 +191,8 @@
 #define QSPIMEM_QUADIO        (1 << 4)  /* Bit 4: Use Quad I/O (READ only) */
 #define QSPIMEM_SCRAMBLE      (1 << 5)  /* Bit 5: Scramble data */
 #define QSPIMEM_RANDOM        (1 << 6)  /* Bit 6: Use random key in scrambler */
+#define QSPIMEM_IDUAL         (1 << 7)  /* Bit 7: Instruction on two lines */
+#define QSPIMEM_IQUAD         (1 << 0)  /* Bit 0: Instruction on four lines */
 
 #define QSPIMEM_ISREAD(f)     (((f) & QSPIMEM_WRITE) == 0)
 #define QSPIMEM_ISWRITE(f)    (((f) & QSPIMEM_WRITE) != 0)

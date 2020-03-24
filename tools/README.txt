@@ -856,7 +856,7 @@ refresh.sh
     $ tools/refresh.sh --help
     tools/refresh.sh is a tool for refreshing board configurations
 
-    USAGE: ./refresh.sh [options] <board>/<config>
+    USAGE: ./refresh.sh [options] <board>/<config>+
 
     Where [options] include:
       --debug
@@ -940,15 +940,15 @@ sethost.sh
 
     $ ./sethost.sh -h
 
-    USAGE: ./sethost.sh [-l|m|c|u|g|n] [<config>]
+    USAGE: ./sethost.sh [-l|m|c|u|g|n] [make-opts]
            ./sethost.sh -h
 
     Where:
       -l|m|c|u|g|n selects Linux (l), macOS (m), Cygwin (c),
          Ubuntu under Windows 10 (u), MSYS/MSYS2 (g)
          or Windows native (n).  Default Linux
+      make-opts directly pass to make
       -h will show this help test and terminate
-      <config> selects configuration file.  Default: .config
 
 simhostroute.sh
 ---------------
