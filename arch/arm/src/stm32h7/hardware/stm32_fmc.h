@@ -1,4 +1,4 @@
-/************************************************************************************
+/*****************************************************************************************************************************************************
  * arch/arm/src/stm32h7/hardware/stm32_fmc.h
  *
  *   Copyright (C) 2018 Gregory Nutt. All rights reserved.
@@ -31,24 +31,24 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- ************************************************************************************/
+ *****************************************************************************************************************************************************/
 
 #ifndef __ARCH_ARM_SRC_STM32H7_HARDWARE_STM32_FMC_H
 #define __ARCH_ARM_SRC_STM32H7_HARDWARE_STM32_FMC_H
 
-/************************************************************************************
+/*****************************************************************************************************************************************************
  * Included Files
- ************************************************************************************/
+ *****************************************************************************************************************************************************/
 
 #include <nuttx/config.h>
 
 #include "chip.h"
 
-/************************************************************************************
+/*****************************************************************************************************************************************************
  * Pre-processor Definitions
- ************************************************************************************/
+ *****************************************************************************************************************************************************/
 
-/* Register Offsets *****************************************************************/
+/* Register Offsets **********************************************************************************************************************************/
 
 #define STM32_FMC_BCR_OFFSET(n)         (8*((n)-1))
 #define STM32_FMC_BCR1_OFFSET           0x0000          /* SRAM/NOR-Flash chip-select control registers 1 */
@@ -90,7 +90,7 @@
 #define STM32_FMC_SDRTR_OFFSET          0x0154          /* SDRAM Refresh Timing Register maybe */
 #define STM32_FMC_SDSR_OFFSET           0x0158          /* SDRAM Status Register */
 
-/* Register Addresses ***************************************************************/
+/* Register Addresses ********************************************************************************************************************************/
 
 #define STM32_FMC_BCR(n)                (STM32_FMC_BASE+STM32_FMC_BCR_OFFSET(n))
 #define STM32_FMC_BCR1                  (STM32_FMC_BASE+STM32_FMC_BCR1_OFFSET )
@@ -130,76 +130,68 @@
 #define STM32_FMC_SDRTR                 (STM32_FMC_BASE+STM32_FMC_SDRTR_OFFSET)
 #define STM32_FMC_SDSR                  (STM32_FMC_BASE+STM32_FMC_SDSR_OFFSET)
 
-/* Register Bitfield Definitions ****************************************************/
+/* Register Bitfield Definitions *********************************************************************************************************************/
 
-#define FMC_BCR_MBKEN                   (1 << 0)        /* Memory bank enable bit */
-#define FMC_BCR_MUXEN                   (1 << 1)        /* Address/data multiplexing enable bit */
-#define FMC_BCR_MTYP_SHIFT              (2)             /* Memory type */
+#define FMC_BCR_MBKEN                   (1 << 0)                        /* Memory bank enable bit */
+#define FMC_BCR_MUXEN                   (1 << 1)                        /* Address/data multiplexing enable bit */
+#define FMC_BCR_MTYP_SHIFT              (2)                             /* Memory type */
 #define FMC_BCR_MTYP_MASK               (3 << FMC_BCR_MTYP_SHIFT)
 #  define FMC_BCR_SRAM                  (0 << FMC_BCR_MTYP_SHIFT)
 #  define FMC_BCR_ROM                   (0 << FMC_BCR_MTYP_SHIFT)
 #  define FMC_BCR_PSRAM                 (1 << FMC_BCR_MTYP_SHIFT)
 #  define FMC_BCR_CRAM                  (1 << FMC_BCR_MTYP_SHIFT)
 #  define FMC_BCR_NOR                   (2 << FMC_BCR_MTYP_SHIFT)
-#define FMC_BCR_MWID_SHIFT              (4)             /* Memory data bus width */
+#define FMC_BCR_MWID_SHIFT              (4)                             /* Memory data bus width */
 #define FMC_BCR_MWID_MASK               (3 <<  FMC_BCR_MWID_SHIFT)
 #  define FMC_BCR_MWID8                 (0 << FMC_BCR_MWID_SHIFT)
 #  define FMC_BCR_MWID16                (1 << FMC_BCR_MWID_SHIFT)
 #  define FMC_BCR_MWID32                (2 << FMC_BCR_MWID_SHIFT)
-#define FMC_BCR_FACCEN                  (1 << 6)        /* Flash access enable */
-#define FMC_BCR_BURSTEN                 (1 << 8)        /* Burst enable bit */
-#define FMC_BCR_WAITPOL                 (1 << 9)        /* Wait signal polarity bit */
-#define FMC_BCR_WAITCFG                 (1 << 11)       /* Wait timing configuration */
-#define FMC_BCR_WREN                    (1 << 12)       /* Write enable bit */
-#define FMC_BCR_WAITEN                  (1 << 13)       /* Wait enable bit */
-#define FMC_BCR_EXTMOD                  (1 << 14)       /* Extended mode enable */
-#define FMC_BCR_ASYNCWAIT               (1 << 15)       /* Wait signal during asynchronous transfers */
+#define FMC_BCR_FACCEN                  (1 << 6)                        /* Flash access enable */
+#define FMC_BCR_BURSTEN                 (1 << 8)                        /* Burst enable bit */
+#define FMC_BCR_WAITPOL                 (1 << 9)                        /* Wait signal polarity bit */
+#define FMC_BCR_WAITCFG                 (1 << 11)                       /* Wait timing configuration */
+#define FMC_BCR_WREN                    (1 << 12)                       /* Write enable bit */
+#define FMC_BCR_WAITEN                  (1 << 13)                       /* Wait enable bit */
+#define FMC_BCR_EXTMOD                  (1 << 14)                       /* Extended mode enable */
+#define FMC_BCR_ASYNCWAIT               (1 << 15)                       /* Wait signal during asynchronous transfers */
 #define FMC_BCR_CPSIZE_SHIFT            (16)
 #define FMC_BCR_CPSIZE_MASK             (7 << FMC_BCR_CPSIZE_SHIFT)
 #  define FMC_BCR_CPSIZE0               (0 << FMC_BCR_CPSIZE_SHIFT)
 #  define FMC_BCR_CPSIZE128             (1 << FMC_BCR_CPSIZE_SHIFT)
 #  define FMC_BCR_CPSIZE256             (2 << FMC_BCR_CPSIZE_SHIFT)
 #  define FMC_BCR_CPSIZE1024            (3 << FMC_BCR_CPSIZE_SHIFT)
-#define FMC_BCR_CBURSTRW                (1 << 19)       /* Write burst enable */
-#define FMC_BCR_CCLKEN                  (1 << 20)       /* Continuous Clock Enable */
-#define FMC_BCR_WFDIS                   (1 << 21)       /* Write FIFO Disable */
+#define FMC_BCR_CBURSTRW                (1 << 19)                       /* Write burst enable */
+#define FMC_BCR_CCLKEN                  (1 << 20)                       /* Continuous Clock Enable */
+#define FMC_BCR_WFDIS                   (1 << 21)                       /* Write FIFO Disable */
 #define FMC_BCR_BMAP_SHIFT              (24)
 #define FMC_BCR_BMAP_MASK               (3 << FMC_BCR_BMAP_SHIFT)
-#  define FMC_BCR_BMAP0                 (0 << FMC_BCR_BMAP_SHIFT)
-                                                        /* Default mapping */
-#  define FMC_BCR_BMAP1                 (1 << FMC_BCR_BMAP_SHIFT)
-                                                        /* NOR/PSRAM bank and SDRAM bank 1/bank2 are swapped */
-#  define FMC_BCR_BMAP2                 (2 << FMC_BCR_BMAP_SHIFT)
-                                                        /* SDRAM Bank2 remapped on FMC bank2 and still accessible at default mapping */
-#define FMC_BCR_FMCEN                   (1 << 31)       /* FMC controller Enable */
+#  define FMC_BCR_BMAP0                 (0 << FMC_BCR_BMAP_SHIFT)       /* Default mapping */
+#  define FMC_BCR_BMAP1                 (1 << FMC_BCR_BMAP_SHIFT)       /* NOR/PSRAM bank and SDRAM bank 1/bank2 are swapped */
+#  define FMC_BCR_BMAP2                 (2 << FMC_BCR_BMAP_SHIFT)       /* SDRAM Bank2 remapped on FMC bank2 and still accessible at default mapping */
+#define FMC_BCR_FMCEN                   (1 << 31)                       /* FMC controller Enable */
 
 #define FMC_BCR_RSTVALUE(n)             ((n == 0) ? 0x000030db : 0x000030d2) /* Reset value for BCR */
 
-#define FMC_BTR_ADDSET_SHIFT            (0)             /* Address setup phase duration */
+#define FMC_BTR_ADDSET_SHIFT            (0)                             /* Address setup phase duration */
 #define FMC_BTR_ADDSET_MASK             (15 << FMC_BTR_ADDSET_SHIFT)
-#  define FMC_BTR_ADDSET(n)             ((n-1) << FMC_BTR_ADDSET_SHIFT)
-                                                        /* (n)xHCLK n=1..16 */
-#define FMC_BTR_ADDHLD_SHIFT            (4)             /* Address-hold phase duration */
+#  define FMC_BTR_ADDSET(n)             ((n-1) << FMC_BTR_ADDSET_SHIFT) /* (n)xHCLK n=1..16 */
+#define FMC_BTR_ADDHLD_SHIFT            (4)                             /* Address-hold phase duration */
 #define FMC_BTR_ADDHLD_MASK             (15 << FMC_BTR_ADDHLD_SHIFT)
-#  define FMC_BTR_ADDHLD(n)             ((n-1) << FMC_BTR_ADDHLD_SHIFT)
-                                                        /* (n)xHCLK n=2..16*/
-#define FMC_BTR_DATAST_SHIFT            (8)             /* Data-phase duration */
+#  define FMC_BTR_ADDHLD(n)             ((n-1) << FMC_BTR_ADDHLD_SHIFT) /* (n)xHCLK n=2..16*/
+#define FMC_BTR_DATAST_SHIFT            (8)                             /* Data-phase duration */
 #define FMC_BTR_DATAST_MASK             (255 << FMC_BTR_DATAST_SHIFT)
-#  define FMC_BTR_DATAST(n)             ((n-1) << FMC_BTR_DATAST_SHIFT)
-                                                        /* (n)xHCLK n=2..256 */
-#define FMC_BTR_BUSTURN_SHIFT           (16)            /* Bus turnaround phase duration */
+#  define FMC_BTR_DATAST(n)             ((n-1) << FMC_BTR_DATAST_SHIFT) /* (n)xHCLK n=2..256 */
+#define FMC_BTR_BUSTURN_SHIFT           (16)                            /* Bus turnaround phase duration */
 #define FMC_BTR_BUSTURN_MASK            (15 << FMC_BTR1_BUSTURN_SHIFT)
-#  define FMC_BTR_BUSTURN(n)            ((n-1) << FMC_BTR_BUSTURN_SHIFT)
-                                                        /* (n)xHCLK n=1..16 */
-#define FMC_BTR_CLKDIV_SHIFT            (20)            /* Clock divide ratio */
+#  define FMC_BTR_BUSTURN(n)            ((n-1) << FMC_BTR_BUSTURN_SHIFT)/* (n)xHCLK n=1..16 */
+#define FMC_BTR_CLKDIV_SHIFT            (20)                            /* Clock divide ratio */
 #define FMC_BTR_CLKDIV_MASK             (15 << FMC_BTR_CLKDIV_SHIFT)
-#  define FMC_BTR_CLKDIV(n)             ((n-1) << FMC_BTR_CLKDIV_SHIFT)
-                                                        /* (n)xHCLK n=2..16 */
-#define FMC_BTR_DATLAT_SHIFT            (24)            /* Data latency */
+#  define FMC_BTR_CLKDIV(n)             ((n-1) << FMC_BTR_CLKDIV_SHIFT) /* (n)xHCLK n=2..16 */
+#define FMC_BTR_DATLAT_SHIFT            (24)                            /* Data latency */
 #define FMC_BTR_DATLAT_MASK             (15 << FMC_BTR_DATLAT_SHIFT)
 #  define FMC_BTR_DATLAT(n)             ((n-2) << FMC_BTR_DATLAT_SHIFT)
-                                                        /* (n)xHCLK n=2..17 */
-#define FMC_BTR_ACCMOD_SHIFT            (28)            /* Access mode */
+                                                                        /* (n)xHCLK n=2..17 */
+#define FMC_BTR_ACCMOD_SHIFT            (28)                            /* Access mode */
 #define FMC_BTR_ACCMOD_MASK             (3 << FMC_BTR_ACCMOD_SHIFT)
 #  define FMC_BTR_ACCMODA               (0 << FMC_BTR_ACCMOD_SHIFT)
 #  define FMC_BTR_ACCMODB               (1 << FMC_BTR_ACCMOD_SHIFT)
