@@ -868,7 +868,19 @@ static int qspi_setupxctnfromcmd(struct qspi_xctnspec_s *xctn,
     {
       /* XXX III data mode mode, single, dual, quad option bits */
 
-      xctn->datamode = CCR_DMODE_SINGLE;
+      if (QSPICMD_ISQUADIO(cmdinfo->flags))
+        {
+          xctn->datamode = CCR_DMODE_QUAD;
+        }
+      else if (QSPICMD_ISDUALIO(cmdinfo->flags))
+        {
+          xctn->datamode = CCR_DMODE_DUAL;
+        }
+      else
+        {
+          xctn->datamode = CCR_DMODE_SINGLE;
+        }
+
       xctn->datasize = cmdinfo->buflen;
 
       /* XXX III double data rate option bits */
@@ -1146,6 +1158,11 @@ static void qspi_ccrconfig(struct stm32h7_qspidev_s *priv,
 
   if (CCR_ADMODE_NONE != xctn->addrmode && CCR_FMODE_MEMMAP != fctn)
     {
+      /* If address exceeds configured address space, QUADSPI will not
+       * start a I/O cycle, resulting in a lockup.
+       */
+
+      DEBUGASSERT(xctn->addr < CONFIG_STM32H7_QSPI_FLASH_SIZE);
       qspi_putreg(priv, xctn->addr, STM32_QUADSPI_AR_OFFSET);
     }
 }

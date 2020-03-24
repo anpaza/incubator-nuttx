@@ -152,6 +152,8 @@
 #define QSPICMD_WRITEDATA     (1 << 2)  /* Bit 2: Enable write data transfer */
 #define QSPICMD_IDUAL         (1 << 3)  /* Bit 3: Instruction on two lines */
 #define QSPICMD_IQUAD         (1 << 4)  /* Bit 4: Instruction on four lines */
+#define QSPICMD_DUALIO        (1 << 5)  /* Bit 5: I/O data on two lines */
+#define QSPICMD_QUADIO        (1 << 6)  /* Bit 6: I/O data on four lines */
 
 #define QSPICMD_ISADDRESS(f)  (((f) & QSPICMD_ADDRESS) != 0)
 #define QSPICMD_ISDATA(f)     (((f) & (QSPICMD_READDATA | QSPICMD_WRITEDATA)) != 0)
@@ -159,6 +161,8 @@
 #define QSPICMD_ISWRITE(f)    (((f) & QSPICMD_WRITEDATA) != 0)
 #define QSPICMD_ISIDUAL(f)    (((f) & QSPICMD_IDUAL) != 0)
 #define QSPICMD_ISIQUAD(f)    (((f) & QSPICMD_IQUAD) != 0)
+#define QSPICMD_ISDUALIO(f)   (((f) & QSPICMD_DUALIO) != 0)
+#define QSPICMD_ISQUADIO(f)   (((f) & QSPICMD_QUADIO) != 0)
 
 /****************************************************************************
  * Name: QSPI_MEMORY
@@ -179,14 +183,14 @@
 
 /* QSPI Memory Transfer Flags */
 
+#define QSPIMEM_IDUAL         (1 << 0)  /* Bit 0: Instruction on two lines */
+#define QSPIMEM_IQUAD         (1 << 1)  /* Bit 1: Instruction on four lines */
 #define QSPIMEM_READ          (0)       /* Bit 2: 0=Memory read data transfer */
 #define QSPIMEM_WRITE         (1 << 2)  /* Bit 2: 1=Memory write data transfer */
 #define QSPIMEM_DUALIO        (1 << 3)  /* Bit 3: Use Dual I/O (READ only) */
 #define QSPIMEM_QUADIO        (1 << 4)  /* Bit 4: Use Quad I/O (READ only) */
 #define QSPIMEM_SCRAMBLE      (1 << 5)  /* Bit 5: Scramble data */
 #define QSPIMEM_RANDOM        (1 << 6)  /* Bit 6: Use random key in scrambler */
-#define QSPIMEM_IDUAL         (1 << 7)  /* Bit 7: Instruction on two lines */
-#define QSPIMEM_IQUAD         (1 << 0)  /* Bit 0: Instruction on four lines */
 
 #define QSPIMEM_ISREAD(f)     (((f) & QSPIMEM_WRITE) == 0)
 #define QSPIMEM_ISWRITE(f)    (((f) & QSPIMEM_WRITE) != 0)
